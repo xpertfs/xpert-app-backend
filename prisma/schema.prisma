@@ -34,7 +34,7 @@ enum UserRole {
 }
 
 model Company {
-  id             String     @id @default(uuid())
+  id             String       @id @default(uuid())
   name           String
   address        String?
   city           String?
@@ -43,16 +43,38 @@ model Company {
   phone          String?
   email          String?
   logo           String?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
   users          User[]
   clients        Client[]
   projects       Project[]
+  contractors    Contractor[]
   employees      Employee[]
   expenses       Expense[]
   materials      Material[]
   vendors        Vendor[]
   unionClasses   UnionClass[]
+}
+
+// General Contractor model
+model Contractor {
+  id          String    @id @default(uuid())
+  code        String
+  name        String
+  address     String?
+  city        String?
+  state       String?
+  zip         String?
+  phone       String?
+  email       String?
+  contactName String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  company     Company   @relation(fields: [companyId], references: [id])
+  companyId   String
+  projects    Project[]
+
+  @@unique([companyId, code])
 }
 
 // Client & Project models
@@ -95,6 +117,8 @@ model Project {
   clientId        String
   company         Company           @relation(fields: [companyId], references: [id])
   companyId       String
+  contractor      Contractor?       @relation(fields: [contractorId], references: [id])
+  contractorId    String?
   scopes          Scope[]
   projectWorkItems ProjectWorkItem[]
   expenses        Expense[]
