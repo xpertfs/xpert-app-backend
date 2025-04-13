@@ -6,17 +6,36 @@ import { logger } from '../utils/logger';
 const prisma = new PrismaClient();
 
 /**
- * Get all work items
+ * Get all work items for a project
  * 
- * @route GET /api/work-items
+ * @route GET /api/projects/:projectId/work-items
  * @access Private
  */
 export const getWorkItems = async (req: Request, res: Response) => {
   try {
+    const { projectId } = req.params;
     const { search, sortBy = 'code', sortOrder = 'asc' } = req.query;
+    const companyId = req.user?.companyId;
+
+    if (!companyId) {
+      return res.status(400).json({ message: 'Company ID is required' });
+    }
+
+    // Check if project exists and belongs to this company
+    const project = await prisma.project.findUnique({
+      where: {
+        id: projectId,
+        companyId,
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
 
     // Build filter conditions
     const where: any = {
+      projectId,
       ...(search
         ? {
             OR: [
@@ -28,7 +47,7 @@ export const getWorkItems = async (req: Request, res: Response) => {
         : {}),
     };
 
-    // Get work items
+    // Get work items for this project
     const workItems = await prisma.workItem.findMany({
       where,
       orderBy: {
@@ -38,7 +57,7 @@ export const getWorkItems = async (req: Request, res: Response) => {
 
     return res.status(200).json(workItems);
   } catch (error) {
-    logger.error('Error getting work items:', error);
+    logger.error(`Error getting work items for project ${req.params.projectId}:`, error);
     return res.status(500).json({ message: 'Failed to get work items' });
   }
 };
@@ -46,17 +65,35 @@ export const getWorkItems = async (req: Request, res: Response) => {
 /**
  * Get work item by ID
  * 
- * @route GET /api/work-items/:id
+ * @route GET /api/projects/:projectId/work-items/:id
  * @access Private
  */
 export const getWorkItemById = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const { projectId, id } = req.params;
+    const companyId = req.user?.companyId;
+
+    if (!companyId) {
+      return res.status(400).json({ message: 'Company ID is required' });
+    }
+
+    // Check if project exists and belongs to this company
+    const project = await prisma.project.findUnique({
+      where: {
+        id: projectId,
+        companyId,
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
 
     // Get work item
     const workItem = await prisma.workItem.findUnique({
       where: {
         id,
+        projectId,
       },
     });
 
@@ -72,39 +109,60 @@ export const getWorkItemById = async (req: Request, res: Response) => {
 };
 
 /**
- * Create a new work item
+ * Create a new work item for a project
  * 
- * @route POST /api/work-items
+ * @route POST /api/projects/:projectId/work-items
  * @access Private
  */
 export const createWorkItem = async (req: Request, res: Response) => {
   try {
-    const { code, name, description, unit } = req.body;
+    const { projectId } = req.params;
+    const { code, name, description, unit, unitPrice } = req.body;
+    const companyId = req.user?.companyId;
 
-    // Check if work item code already exists
+    if (!companyId) {
+      return res.status(400).json({ message: 'Company ID is required' });
+    }
+
+    // Check if project exists and belongs to this company
+    const project = await prisma.project.findUnique({
+      where: {
+        id: projectId,
+        companyId,
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check if work item code already exists in this project
     const existingWorkItem = await prisma.workItem.findFirst({
       where: {
+        projectId,
         code,
       },
     });
 
     if (existingWorkItem) {
-      return res.status(409).json({ message: 'Work item code already exists' });
+      return res.status(409).json({ message: 'Work item code already exists in this project' });
     }
 
     // Create work item
     const workItem = await prisma.workItem.create({
       data: {
+        projectId,
         code,
         name,
         description,
         unit,
+        unitPrice,
       },
     });
 
     return res.status(201).json(workItem);
   } catch (error) {
-    logger.error('Error creating work item:', error);
+    logger.error(`Error creating work item for project ${req.params.projectId}:`, error);
     return res.status(500).json({ message: 'Failed to create work item' });
   }
 };
@@ -112,18 +170,36 @@ export const createWorkItem = async (req: Request, res: Response) => {
 /**
  * Update a work item
  * 
- * @route PUT /api/work-items/:id
+ * @route PUT /api/projects/:projectId/work-items/:id
  * @access Private
  */
 export const updateWorkItem = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const { name, description, unit } = req.body;
+    const { projectId, id } = req.params;
+    const { name, description, unit, unitPrice } = req.body;
+    const companyId = req.user?.companyId;
 
-    // Check if work item exists
+    if (!companyId) {
+      return res.status(400).json({ message: 'Company ID is required' });
+    }
+
+    // Check if project exists and belongs to this company
+    const project = await prisma.project.findUnique({
+      where: {
+        id: projectId,
+        companyId,
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check if work item exists and belongs to this project
     const existingWorkItem = await prisma.workItem.findUnique({
       where: {
         id,
+        projectId,
       },
     });
 
@@ -140,6 +216,7 @@ export const updateWorkItem = async (req: Request, res: Response) => {
         name,
         description,
         unit,
+        unitPrice,
       },
     });
 
@@ -153,36 +230,40 @@ export const updateWorkItem = async (req: Request, res: Response) => {
 /**
  * Delete a work item
  * 
- * @route DELETE /api/work-items/:id
+ * @route DELETE /api/projects/:projectId/work-items/:id
  * @access Private
  */
 export const deleteWorkItem = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const { projectId, id } = req.params;
+    const companyId = req.user?.companyId;
 
-    // Check if work item exists
+    if (!companyId) {
+      return res.status(400).json({ message: 'Company ID is required' });
+    }
+
+    // Check if project exists and belongs to this company
+    const project = await prisma.project.findUnique({
+      where: {
+        id: projectId,
+        companyId,
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check if work item exists and belongs to this project
     const existingWorkItem = await prisma.workItem.findUnique({
       where: {
         id,
+        projectId,
       },
     });
 
     if (!existingWorkItem) {
       return res.status(404).json({ message: 'Work item not found' });
-    }
-
-    // Check if work item is associated with any projects
-    const projectWorkItemCount = await prisma.projectWorkItem.count({
-      where: {
-        workItemId: id,
-      },
-    });
-
-    if (projectWorkItemCount > 0) {
-      return res.status(400).json({
-        message: 'Cannot delete work item that is associated with projects',
-        count: projectWorkItemCount,
-      });
     }
 
     // Check if work item is associated with any sub-scopes
@@ -194,7 +275,7 @@ export const deleteWorkItem = async (req: Request, res: Response) => {
 
     if (workItemQuantityCount > 0) {
       return res.status(400).json({
-        message: 'Cannot delete work item that is associated with sub-scopes',
+        message: 'Cannot delete work item that is being used in project sub-scopes',
         count: workItemQuantityCount,
       });
     }
@@ -214,222 +295,14 @@ export const deleteWorkItem = async (req: Request, res: Response) => {
 };
 
 /**
- * Add work item to project with unit price
- * 
- * @route POST /api/projects/:projectId/work-items
- * @access Private
- */
-export const addWorkItemToProject = async (req: Request, res: Response) => {
-  try {
-    const { projectId } = req.params;
-    const { workItemId, unitPrice } = req.body;
-    const companyId = req.user?.companyId;
-
-    if (!companyId) {
-      return res.status(400).json({ message: 'Company ID is required' });
-    }
-
-    // Check if project exists and belongs to this company
-    const project = await prisma.project.findUnique({
-      where: {
-        id: projectId,
-        companyId,
-      },
-    });
-
-    if (!project) {
-      return res.status(404).json({ message: 'Project not found' });
-    }
-
-    // Check if work item exists
-    const workItem = await prisma.workItem.findUnique({
-      where: {
-        id: workItemId,
-      },
-    });
-
-    if (!workItem) {
-      return res.status(404).json({ message: 'Work item not found' });
-    }
-
-    // Check if work item is already associated with this project
-    const existingProjectWorkItem = await prisma.projectWorkItem.findUnique({
-      where: {
-        projectId_workItemId: {
-          projectId,
-          workItemId,
-        },
-      },
-    });
-
-    if (existingProjectWorkItem) {
-      return res.status(409).json({ message: 'Work item already added to project' });
-    }
-
-    // Add work item to project
-    const projectWorkItem = await prisma.projectWorkItem.create({
-      data: {
-        projectId,
-        workItemId,
-        unitPrice,
-      },
-      include: {
-        workItem: true,
-      },
-    });
-
-    return res.status(201).json(projectWorkItem);
-  } catch (error) {
-    logger.error(`Error adding work item to project ${req.params.projectId}:`, error);
-    return res.status(500).json({ message: 'Failed to add work item to project' });
-  }
-};
-
-/**
- * Update project work item unit price
- * 
- * @route PUT /api/projects/:projectId/work-items/:workItemId
- * @access Private
- */
-export const updateProjectWorkItem = async (req: Request, res: Response) => {
-  try {
-    const { projectId, workItemId } = req.params;
-    const { unitPrice } = req.body;
-    const companyId = req.user?.companyId;
-
-    if (!companyId) {
-      return res.status(400).json({ message: 'Company ID is required' });
-    }
-
-    // Check if project exists and belongs to this company
-    const project = await prisma.project.findUnique({
-      where: {
-        id: projectId,
-        companyId,
-      },
-    });
-
-    if (!project) {
-      return res.status(404).json({ message: 'Project not found' });
-    }
-
-    // Check if project work item exists
-    const existingProjectWorkItem = await prisma.projectWorkItem.findUnique({
-      where: {
-        projectId_workItemId: {
-          projectId,
-          workItemId,
-        },
-      },
-    });
-
-    if (!existingProjectWorkItem) {
-      return res.status(404).json({ message: 'Work item not associated with this project' });
-    }
-
-    // Update project work item
-    const projectWorkItem = await prisma.projectWorkItem.update({
-      where: {
-        id: existingProjectWorkItem.id,
-      },
-      data: {
-        unitPrice,
-      },
-      include: {
-        workItem: true,
-      },
-    });
-
-    return res.status(200).json(projectWorkItem);
-  } catch (error) {
-    logger.error(`Error updating project work item for project ${req.params.projectId}:`, error);
-    return res.status(500).json({ message: 'Failed to update project work item' });
-  }
-};
-
-/**
- * Remove work item from project
- * 
- * @route DELETE /api/projects/:projectId/work-items/:workItemId
- * @access Private
- */
-export const removeWorkItemFromProject = async (req: Request, res: Response) => {
-  try {
-    const { projectId, workItemId } = req.params;
-    const companyId = req.user?.companyId;
-
-    if (!companyId) {
-      return res.status(400).json({ message: 'Company ID is required' });
-    }
-
-    // Check if project exists and belongs to this company
-    const project = await prisma.project.findUnique({
-      where: {
-        id: projectId,
-        companyId,
-      },
-    });
-
-    if (!project) {
-      return res.status(404).json({ message: 'Project not found' });
-    }
-
-    // Check if project work item exists
-    const existingProjectWorkItem = await prisma.projectWorkItem.findUnique({
-      where: {
-        projectId_workItemId: {
-          projectId,
-          workItemId,
-        },
-      },
-    });
-
-    if (!existingProjectWorkItem) {
-      return res.status(404).json({ message: 'Work item not associated with this project' });
-    }
-
-    // Check if work item is being used in any sub-scopes
-    const workItemQuantityCount = await prisma.workItemQuantity.count({
-      where: {
-        workItemId,
-        subScope: {
-          scope: {
-            projectId,
-          },
-        },
-      },
-    });
-
-    if (workItemQuantityCount > 0) {
-      return res.status(400).json({
-        message: 'Cannot remove work item that is being used in project sub-scopes',
-        count: workItemQuantityCount,
-      });
-    }
-
-    // Remove work item from project
-    await prisma.projectWorkItem.delete({
-      where: {
-        id: existingProjectWorkItem.id,
-      },
-    });
-
-    return res.status(200).json({ message: 'Work item removed from project successfully' });
-  } catch (error) {
-    logger.error(`Error removing work item from project ${req.params.projectId}:`, error);
-    return res.status(500).json({ message: 'Failed to remove work item from project' });
-  }
-};
-
-/**
  * Add work item to sub-scope with quantity
  * 
- * @route POST /api/sub-scopes/:subScopeId/work-items
+ * @route POST /api/projects/:projectId/scopes/:scopeId/sub-scopes/:subScopeId/work-items
  * @access Private
  */
 export const addWorkItemToSubScope = async (req: Request, res: Response) => {
   try {
-    const { subScopeId } = req.params;
+    const { projectId, scopeId, subScopeId } = req.params;
     const { workItemId, quantity, completed = 0 } = req.body;
     const companyId = req.user?.companyId;
 
@@ -437,21 +310,25 @@ export const addWorkItemToSubScope = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Company ID is required' });
     }
 
-    // Check if sub-scope exists and belongs to a project in this company
+    // Check if project exists and belongs to this company
+    const project = await prisma.project.findUnique({
+      where: {
+        id: projectId,
+        companyId,
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check if sub-scope exists and belongs to this project
     const subScope = await prisma.subScope.findFirst({
       where: {
         id: subScopeId,
         scope: {
-          project: {
-            companyId,
-          },
-        },
-      },
-      include: {
-        scope: {
-          select: {
-            projectId: true,
-          },
+          id: scopeId,
+          projectId,
         },
       },
     });
@@ -460,18 +337,16 @@ export const addWorkItemToSubScope = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Sub-scope not found' });
     }
 
-    // Check if work item exists in the project
-    const projectWorkItem = await prisma.projectWorkItem.findUnique({
+    // Check if work item exists and belongs to this project
+    const workItem = await prisma.workItem.findUnique({
       where: {
-        projectId_workItemId: {
-          projectId: subScope.scope.projectId,
-          workItemId,
-        },
+        id: workItemId,
+        projectId,
       },
     });
 
-    if (!projectWorkItem) {
-      return res.status(400).json({ message: 'Work item must be added to the project first' });
+    if (!workItem) {
+      return res.status(404).json({ message: 'Work item not found' });
     }
 
     // Check if work item is already in the sub-scope
@@ -511,12 +386,12 @@ export const addWorkItemToSubScope = async (req: Request, res: Response) => {
 /**
  * Update work item quantity in sub-scope
  * 
- * @route PUT /api/sub-scopes/:subScopeId/work-items/:workItemId
+ * @route PUT /api/projects/:projectId/scopes/:scopeId/sub-scopes/:subScopeId/work-items/:workItemId
  * @access Private
  */
 export const updateWorkItemQuantity = async (req: Request, res: Response) => {
   try {
-    const { subScopeId, workItemId } = req.params;
+    const { projectId, scopeId, subScopeId, workItemId } = req.params;
     const { quantity, completed } = req.body;
     const companyId = req.user?.companyId;
 
@@ -524,14 +399,25 @@ export const updateWorkItemQuantity = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Company ID is required' });
     }
 
-    // Check if sub-scope exists and belongs to a project in this company
+    // Check if project exists and belongs to this company
+    const project = await prisma.project.findUnique({
+      where: {
+        id: projectId,
+        companyId,
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check if sub-scope exists and belongs to this project
     const subScope = await prisma.subScope.findFirst({
       where: {
         id: subScopeId,
         scope: {
-          project: {
-            companyId,
-          },
+          id: scopeId,
+          projectId,
         },
       },
     });
@@ -540,7 +426,19 @@ export const updateWorkItemQuantity = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Sub-scope not found' });
     }
 
-    // Check if work item exists in the sub-scope
+    // Check if work item exists and belongs to this project
+    const workItem = await prisma.workItem.findUnique({
+      where: {
+        id: workItemId,
+        projectId,
+      },
+    });
+
+    if (!workItem) {
+      return res.status(404).json({ message: 'Work item not found' });
+    }
+
+    // Check if work item quantity exists
     const existingWorkItemQuantity = await prisma.workItemQuantity.findUnique({
       where: {
         subScopeId_workItemId: {
@@ -586,26 +484,37 @@ export const updateWorkItemQuantity = async (req: Request, res: Response) => {
 /**
  * Remove work item from sub-scope
  * 
- * @route DELETE /api/sub-scopes/:subScopeId/work-items/:workItemId
+ * @route DELETE /api/projects/:projectId/scopes/:scopeId/sub-scopes/:subScopeId/work-items/:workItemId
  * @access Private
  */
 export const removeWorkItemFromSubScope = async (req: Request, res: Response) => {
   try {
-    const { subScopeId, workItemId } = req.params;
+    const { projectId, scopeId, subScopeId, workItemId } = req.params;
     const companyId = req.user?.companyId;
 
     if (!companyId) {
       return res.status(400).json({ message: 'Company ID is required' });
     }
 
-    // Check if sub-scope exists and belongs to a project in this company
+    // Check if project exists and belongs to this company
+    const project = await prisma.project.findUnique({
+      where: {
+        id: projectId,
+        companyId,
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check if sub-scope exists and belongs to this project
     const subScope = await prisma.subScope.findFirst({
       where: {
         id: subScopeId,
         scope: {
-          project: {
-            companyId,
-          },
+          id: scopeId,
+          projectId,
         },
       },
     });
@@ -614,7 +523,19 @@ export const removeWorkItemFromSubScope = async (req: Request, res: Response) =>
       return res.status(404).json({ message: 'Sub-scope not found' });
     }
 
-    // Check if work item exists in the sub-scope
+    // Check if work item exists and belongs to this project
+    const workItem = await prisma.workItem.findUnique({
+      where: {
+        id: workItemId,
+        projectId,
+      },
+    });
+
+    if (!workItem) {
+      return res.status(404).json({ message: 'Work item not found' });
+    }
+
+    // Check if work item quantity exists
     const existingWorkItemQuantity = await prisma.workItemQuantity.findUnique({
       where: {
         subScopeId_workItemId: {
@@ -639,5 +560,64 @@ export const removeWorkItemFromSubScope = async (req: Request, res: Response) =>
   } catch (error) {
     logger.error(`Error removing work item from sub-scope ${req.params.subScopeId}:`, error);
     return res.status(500).json({ message: 'Failed to remove work item from sub-scope' });
+  }
+};
+
+/**
+ * Get work items for a sub-scope
+ * 
+ * @route GET /api/projects/:projectId/scopes/:scopeId/sub-scopes/:subScopeId/work-items
+ * @access Private
+ */
+export const getSubScopeWorkItems = async (req: Request, res: Response) => {
+  try {
+    const { projectId, scopeId, subScopeId } = req.params;
+    const companyId = req.user?.companyId;
+
+    if (!companyId) {
+      return res.status(400).json({ message: 'Company ID is required' });
+    }
+
+    // Check if project exists and belongs to this company
+    const project = await prisma.project.findUnique({
+      where: {
+        id: projectId,
+        companyId,
+      },
+    });
+
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    // Check if sub-scope exists and belongs to this project
+    const subScope = await prisma.subScope.findFirst({
+      where: {
+        id: subScopeId,
+        scope: {
+          id: scopeId,
+          projectId,
+        },
+      },
+    });
+
+    if (!subScope) {
+      return res.status(404).json({ message: 'Sub-scope not found' });
+    }
+
+    // Get work items for this sub-scope
+    const workItemQuantities = await prisma.workItemQuantity.findMany({
+      where: {
+        subScopeId,
+      },
+      include: {
+        workItem: true,
+      },
+    });
+
+    return res.status(200).json(workItemQuantities);
+  } catch (error) {
+    logger.error(`Error getting work items for sub-scope ${req.params.subScopeId}:`, error);
+    return res.status(500).json({ message: 'Failed to get work items for sub-scope' });
   }
 };
