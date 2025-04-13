@@ -24,21 +24,21 @@ const router = Router();
 router.use(authenticate);
 
 // Project work item routes
-router.get('/projects/:projectId/work-items', getWorkItems);
-router.get('/projects/:projectId/work-items/:id', getWorkItemById);
-router.post('/projects/:projectId/work-items', validateRequest(createWorkItemSchema), createWorkItem);
-router.put('/projects/:projectId/work-items/:id', validateRequest(updateWorkItemSchema), updateWorkItem);
-router.delete('/projects/:projectId/work-items/:id', deleteWorkItem);
+router.get('/:projectId/work-items', getWorkItems);
+router.get('/:projectId/work-items/:id', getWorkItemById);
+router.post('/:projectId/work-items', validateRequest(createWorkItemSchema), createWorkItem);
+router.put('/:projectId/work-items/:id', validateRequest(updateWorkItemSchema), updateWorkItem);
+router.delete('/:projectId/work-items/:id', deleteWorkItem);
 
 // Sub-scope work item routes
-router.get('/projects/:projectId/scopes/:scopeId/sub-scopes/:subScopeId/work-items', getSubScopeWorkItems);
+router.get('/:projectId/scopes/:scopeId/sub-scopes/:subScopeId/work-items', getSubScopeWorkItems);
 router.post(
-  '/projects/:projectId/scopes/:scopeId/sub-scopes/:subScopeId/work-items', 
+  '/:projectId/scopes/:scopeId/sub-scopes/:subScopeId/work-items', 
   validateRequest(workItemQuantitySchema), 
   addWorkItemToSubScope
 );
 router.put(
-  '/projects/:projectId/scopes/:scopeId/sub-scopes/:subScopeId/work-items/:workItemId', 
+  '/:projectId/scopes/:scopeId/sub-scopes/:subScopeId/work-items/:workItemId', 
   validateRequest(workItemQuantitySchema), 
   updateWorkItemQuantity
 );

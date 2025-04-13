@@ -113,11 +113,8 @@ export const getProjectById = async (req: Request, res: Response) => {
             },
           },
         },
-        projectWorkItems: {
-          include: {
-            workItem: true,
-          },
-        },
+        // Update to use direct WorkItem relation instead of projectWorkItems
+        workItem: true,
         // Include financial summary
         expenses: {
           select: {
@@ -716,19 +713,6 @@ async function calculateCompletedValue(projectId: string): Promise<number> {
           workItem: true,
         },
       },
-      scope: {
-        include: {
-          project: {
-            include: {
-              projectWorkItems: {
-                include: {
-                  workItem: true,
-                },
-              },
-            },
-          },
-        },
-      },
     },
   });
 
@@ -737,16 +721,10 @@ async function calculateCompletedValue(projectId: string): Promise<number> {
   // Calculate completed value for each sub-scope
   for (const subScope of subScopes) {
     for (const quantity of subScope.workItemQuantities) {
-      // Find the unit price for this work item
-      const projectWorkItem = subScope.scope.project.projectWorkItems.find(
-        (pwi) => pwi.workItemId === quantity.workItemId
-      );
-
-      if (projectWorkItem) {
-        const unitPrice = Number(projectWorkItem.unitPrice);
-        const completed = Number(quantity.completed);
-        completedValue += unitPrice * completed;
-      }
+      // Get the unit price directly from the work item now
+      const unitPrice = Number(quantity.workItem.unitPrice);
+      const completed = Number(quantity.completed);
+      completedValue += unitPrice * completed;
     }
   }
 

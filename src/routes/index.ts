@@ -25,7 +25,7 @@ router.use('/materials', materialRoutes);
 router.use('/reports', reportRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/timesheets', timesheetRoutes);
-router.use('/work-items', workItemRoutes);
+router.use('/projects', workItemRoutes);
 router.use('/', scopeRoutes);
 
 export default router;
