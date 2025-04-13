@@ -1,3 +1,4 @@
+// src/routes/index.ts
 import { Router } from 'express';
 import authRoutes from './auth.routes';
 import projectRoutes from './project.routes';
@@ -9,6 +10,8 @@ import materialRoutes from './material.routes';
 import reportRoutes from './report.routes';
 import settingsRoutes from './settings.routes';
 import timesheetRoutes from './timesheet.routes';
+import workItemRoutes from './workItem.routes';
+import scopeRoutes from './scope.routes';
 
 const router = Router();
 
@@ -22,5 +25,7 @@ router.use('/materials', materialRoutes);
 router.use('/reports', reportRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/timesheets', timesheetRoutes);
+router.use('/work-items', workItemRoutes);
+router.use('/', scopeRoutes);
 
 export default router;
