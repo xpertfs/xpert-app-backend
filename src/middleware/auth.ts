@@ -3,7 +3,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { JWT_SECRET } from '../config/env';
-import prisma from '../../config/database';
+import prisma from '../config/database';
 import { logger } from '../utils/logger';
 
 // Extend Express Request type to include the user
