@@ -14,7 +14,7 @@ const prisma = new PrismaClient();
  */
 export const getProjects = async (req: Request, res: Response) => {
   try {
-    const { search, status, clientId, sortBy = 'updatedAt', sortOrder = 'desc' } = req.query;
+    const { search, status, clientId, contractorId, sortBy = 'updatedAt', sortOrder = 'desc' } = req.query;
     const companyId = req.user?.companyId;
 
     if (!companyId) {
@@ -26,6 +26,7 @@ export const getProjects = async (req: Request, res: Response) => {
       companyId,
       ...(status ? { status: status as string } : {}),
       ...(clientId ? { clientId: clientId as string } : {}),
+      ...(contractorId ? { contractorId: contractorId as string } : {}),
       ...(search
         ? {
             OR: [
@@ -37,11 +38,18 @@ export const getProjects = async (req: Request, res: Response) => {
         : {}),
     };
 
-    // Get projects with client data
+    // Get projects with client and contractor data
     const projects = await prisma.project.findMany({
       where,
       include: {
         client: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+        contractor: {
           select: {
             id: true,
             name: true,
@@ -91,6 +99,7 @@ export const getProjectById = async (req: Request, res: Response) => {
       },
       include: {
         client: true,
+        contractor: true,
         scopes: {
           include: {
             subScopes: {
@@ -212,6 +221,7 @@ export const createProject = async (req: Request, res: Response) => {
       state,
       zip,
       clientId,
+      contractorId,
       startDate,
       endDate,
       status,
@@ -233,6 +243,20 @@ export const createProject = async (req: Request, res: Response) => {
 
     if (!client) {
       return res.status(404).json({ message: 'Client not found' });
+    }
+
+    // Check if contractor exists if contractorId is provided
+    if (contractorId) {
+      const contractor = await prisma.contractor.findUnique({
+        where: {
+          id: contractorId,
+          companyId,
+        },
+      });
+
+      if (!contractor) {
+        return res.status(404).json({ message: 'Contractor not found' });
+      }
     }
 
     // Check if project code already exists for this company
@@ -265,6 +289,23 @@ export const createProject = async (req: Request, res: Response) => {
         value: value || 0,
         companyId,
         clientId,
+        contractorId, // Add contractor association here
+      },
+      include: {
+        client: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+        contractor: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
       },
     });
 
@@ -292,6 +333,7 @@ export const updateProject = async (req: Request, res: Response) => {
       state,
       zip,
       clientId,
+      contractorId,
       startDate,
       endDate,
       status,
@@ -329,6 +371,20 @@ export const updateProject = async (req: Request, res: Response) => {
       }
     }
 
+    // Check if contractor exists if contractorId is provided
+    if (contractorId) {
+      const contractor = await prisma.contractor.findUnique({
+        where: {
+          id: contractorId,
+          companyId,
+        },
+      });
+
+      if (!contractor) {
+        return res.status(404).json({ message: 'Contractor not found' });
+      }
+    }
+
     // Update project
     const project = await prisma.project.update({
       where: {
@@ -342,10 +398,27 @@ export const updateProject = async (req: Request, res: Response) => {
         state,
         zip,
         clientId,
+        contractorId, // Add contractorId to ensure it's handled properly during update
         startDate: startDate ? new Date(startDate) : undefined,
         endDate: endDate ? new Date(endDate) : undefined,
         status,
         value: value !== undefined ? value : undefined,
+      },
+      include: {
+        client: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
+        contractor: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          },
+        },
       },
     });
 
