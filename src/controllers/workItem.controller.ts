@@ -160,6 +160,27 @@ export const createWorkItem = async (req: Request, res: Response) => {
       },
     });
 
+    // Auto-assign to existing sub-scopes with zero quantity
+    const subScopes = await prisma.subScope.findMany({
+      where: {
+        scope: {
+          projectId,
+        },
+      },
+      select: { id: true },
+    });
+
+    if (subScopes.length > 0) {
+      await prisma.workItemQuantity.createMany({
+        data: subScopes.map(subScope => ({
+          subScopeId: subScope.id,
+          workItemId: workItem.id,
+          quantity: 0,
+          completed: 0,
+        })),
+      });
+    }
+
     return res.status(201).json(workItem);
   } catch (error) {
     logger.error(`Error creating work item for project ${req.params.projectId}:`, error);
