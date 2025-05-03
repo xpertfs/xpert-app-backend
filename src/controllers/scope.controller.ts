@@ -384,61 +384,111 @@ export const getSubScopeById = async (req: Request, res: Response) => {
 };
 
 /**
- * Create a new sub-scope for a scope
- * 
+ * Create a new sub-scope for a scope and auto-assign project work items
+ *
  * @route POST /api/scopes/:scopeId/sub-scopes
  * @access Private
  */
 export const createSubScope = async (req: Request, res: Response) => {
+  const { scopeId } = req.params;
+  const { name, code, description } = req.body;
+  const companyId = req.user?.companyId;
+
+  if (!companyId) {
+    return res.status(400).json({ message: 'Company ID is required' });
+  }
+
   try {
-    const { scopeId } = req.params;
-    const { name, code, description } = req.body;
-    const companyId = req.user?.companyId;
-
-    if (!companyId) {
-      return res.status(400).json({ message: 'Company ID is required' });
-    }
-
-    // Check if scope exists and belongs to a project in this company
-    const scope = await prisma.scope.findFirst({
-      where: {
-        id: scopeId,
-        project: {
-          companyId,
+    // Use a transaction to ensure atomicity
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Check if scope exists and belongs to a project in this company
+      const scope = await tx.scope.findFirst({
+        where: {
+          id: scopeId,
+          project: {
+            companyId,
+          },
         },
-      },
-    });
+        select: { // Select only needed fields
+          id: true,
+          projectId: true // Need projectId to find work items
+        }
+      });
 
-    if (!scope) {
-      return res.status(404).json({ message: 'Scope not found' });
-    }
+      if (!scope) {
+        // Throw an error to rollback transaction
+        throw new Error('Scope not found');
+      }
 
-    // Check if sub-scope code already exists in this scope
-    const existingSubScope = await prisma.subScope.findFirst({
-      where: {
-        scopeId,
-        code,
-      },
-    });
+      // 2. Check if sub-scope code already exists in this scope
+      const existingSubScope = await tx.subScope.findFirst({
+        where: {
+          scopeId,
+          code,
+        },
+      });
 
-    if (existingSubScope) {
-      return res.status(409).json({ message: 'Sub-scope code already exists in this scope' });
-    }
+      if (existingSubScope) {
+        // Throw an error to rollback transaction
+        throw new Error('Sub-scope code already exists in this scope');
+      }
 
-    // Create sub-scope
-    const subScope = await prisma.subScope.create({
-      data: {
-        name,
-        code,
-        description,
-        scopeId,
-      },
-    });
+      // 3. Create the new sub-scope
+      const newSubScope = await tx.subScope.create({
+        data: {
+          name,
+          code,
+          description,
+          scopeId,
+        },
+      });
 
-    return res.status(201).json(subScope);
+      // 4. Fetch all work items associated with the parent project
+      const projectWorkItems = await tx.workItem.findMany({
+        where: {
+          projectId: scope.projectId, // Use projectId from the parent scope
+        },
+        select: {
+          id: true, // Only need the ID
+        },
+      });
+
+      // 5. Prepare data for WorkItemQuantity records
+      if (projectWorkItems.length > 0) {
+        const workItemQuantityData = projectWorkItems.map((workItem) => ({
+          subScopeId: newSubScope.id,
+          workItemId: workItem.id,
+          quantity: 0, // Default quantity
+          completed: 0, // Default completed
+        }));
+
+        // 6. Create WorkItemQuantity records for the new sub-scope
+        await tx.workItemQuantity.createMany({
+          data: workItemQuantityData,
+        });
+      }
+
+      // Return the newly created subScope (or include workItemQuantities if needed)
+      return newSubScope;
+    }); // End of transaction
+
+    // If transaction is successful, return the result
+    return res.status(201).json(result);
+
   } catch (error) {
-    logger.error(`Error creating sub-scope for scope ${req.params.scopeId}:`, error);
-    return res.status(500).json({ message: 'Failed to create sub-scope' });
+    logger.error(`Error creating sub-scope for scope ${scopeId}:`, error);
+
+    // Handle specific errors thrown from transaction
+    if (error instanceof Error) {
+        if (error.message === 'Scope not found') {
+            return res.status(404).json({ message: error.message });
+        }
+        if (error.message === 'Sub-scope code already exists in this scope') {
+            return res.status(409).json({ message: error.message });
+        }
+    }
+    // Generic error for other issues during transaction
+    return res.status(500).json({ message: 'Failed to create sub-scope and assign work items' });
   }
 };
 
