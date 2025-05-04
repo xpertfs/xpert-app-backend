@@ -690,6 +690,66 @@ export const updateVendorPrice = async (req: Request, res: Response) => {
 };
 
 /**
+ * Delete a vendor price
+ * 
+ * @route DELETE /api/materials/:materialId/prices/:priceId
+ * @access Private
+ */
+export const deleteVendorPrice = async (req: Request, res: Response) => {
+  try {
+    const { materialId, priceId } = req.params;
+    const companyId = req.user?.companyId;
+
+    if (!companyId) {
+      return res.status(400).json({ message: 'Company ID is required' });
+    }
+
+    // Check if material exists
+    const material = await prisma.material.findUnique({
+      where: {
+        id: materialId,
+        companyId,
+      },
+    });
+
+    if (!material) {
+      return res.status(404).json({ message: 'Material not found' });
+    }
+
+    // Check if vendor price exists
+    const existingPrice = await prisma.vendorPrice.findFirst({
+      where: {
+        id: priceId,
+        materialId,
+      },
+      include: {
+        vendor: {
+          select: {
+            companyId: true,
+          },
+        },
+      },
+    });
+
+    if (!existingPrice || existingPrice.vendor.companyId !== companyId) {
+      return res.status(404).json({ message: 'Vendor price not found' });
+    }
+
+    // Delete vendor price
+    await prisma.vendorPrice.delete({
+      where: {
+        id: priceId,
+      },
+    });
+
+    return res.status(200).json({ message: 'Vendor price deleted successfully' });
+  } catch (error) {
+    logger.error(`Error deleting vendor price ${req.params.priceId}:`, error);
+    return res.status(500).json({ message: 'Failed to delete vendor price' });
+  }
+};
+
+/**
  * Get best price for a material
  * 
  * @route GET /api/materials/:materialId/best-price

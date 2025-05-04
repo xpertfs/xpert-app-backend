@@ -14,6 +14,7 @@ import {
   getVendorPrices,
   createVendorPrice,
   updateVendorPrice,
+  deleteVendorPrice,
   getBestPrice
 } from '../controllers/material.controller';
 import { authenticate } from '../middleware/auth';
@@ -30,13 +31,6 @@ const router = Router();
 
 router.use(authenticate);
 
-// Material routes
-router.get('/', getMaterials);
-router.get('/:id', getMaterialById);
-router.post('/', validateRequest(createMaterialSchema), createMaterial);
-router.put('/:id', validateRequest(updateMaterialSchema), updateMaterial);
-router.delete('/:id', deleteMaterial);
-
 // Vendor routes
 router.get('/vendors', getVendors);
 router.get('/vendors/:id', getVendorById);
@@ -48,6 +42,15 @@ router.delete('/vendors/:id', deleteVendor);
 router.get('/materials/:materialId/prices', getVendorPrices);
 router.post('/materials/:materialId/prices', validateRequest(vendorPriceSchema), createVendorPrice);
 router.put('/materials/:materialId/prices/:priceId', validateRequest(vendorPriceSchema), updateVendorPrice);
+router.delete('/materials/:materialId/prices/:priceId', deleteVendorPrice);
+
+// Best price route
 router.get('/materials/:materialId/best-price', getBestPrice);
+
+// Material routes
+router.get('/materials', getMaterials);
+router.post('/materials', validateRequest(createMaterialSchema), createMaterial);
+router.put('/materials/:id', validateRequest(updateMaterialSchema), updateMaterial);
+router.delete('/materials/:id', deleteMaterial);
 
 export default router;
