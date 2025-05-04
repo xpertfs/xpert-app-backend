@@ -39,18 +39,18 @@ router.put('/vendors/:id', validateRequest(updateVendorSchema), updateVendor);
 router.delete('/vendors/:id', deleteVendor);
 
 // Vendor price routes
-router.get('/materials/:materialId/prices', getVendorPrices);
-router.post('/materials/:materialId/prices', validateRequest(vendorPriceSchema), createVendorPrice);
-router.put('/materials/:materialId/prices/:priceId', validateRequest(vendorPriceSchema), updateVendorPrice);
-router.delete('/materials/:materialId/prices/:priceId', deleteVendorPrice);
+router.get('/:materialId/prices', getVendorPrices);
+router.post('/:materialId/prices', validateRequest(vendorPriceSchema), createVendorPrice);
+router.put('/:materialId/prices/:priceId', validateRequest(vendorPriceSchema), updateVendorPrice);
+router.delete('/:materialId/prices/:priceId', deleteVendorPrice);
 
 // Best price route
-router.get('/materials/:materialId/best-price', getBestPrice);
+router.get('/:materialId/best-price', getBestPrice);
 
 // Material routes
-router.get('/materials', getMaterials);
-router.post('/materials', validateRequest(createMaterialSchema), createMaterial);
-router.put('/materials/:id', validateRequest(updateMaterialSchema), updateMaterial);
-router.delete('/materials/:id', deleteMaterial);
+router.get('/', getMaterials);
+router.post('/', validateRequest(createMaterialSchema), createMaterial);
+router.put('/:id', validateRequest(updateMaterialSchema), updateMaterial);
+router.delete('/:id', deleteMaterial);
 
 export default router;
