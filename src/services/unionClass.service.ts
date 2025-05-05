@@ -90,14 +90,32 @@ export const unionClassService = {
         id,
         companyId,
       },
+      include: {
+        baseRates: true,
+        customRates: true,
+      },
     });
 
     if (!unionClass) {
       throw new BadRequestError('Union class not found');
     }
 
-    return prisma.unionClass.delete({
-      where: { id },
+    // Use a transaction to ensure all deletions are atomic
+    return prisma.$transaction(async (tx) => {
+      // Delete all base rates
+      await tx.unionClassBaseRate.deleteMany({
+        where: { unionClassId: id }
+      });
+
+      // Delete all custom rates
+      await tx.unionClassCustomRate.deleteMany({
+        where: { unionClassId: id }
+      });
+
+      // Finally delete the union class
+      return tx.unionClass.delete({
+        where: { id }
+      });
     });
   },
 
