@@ -14,7 +14,7 @@ export const createEmployeeSchema = yup.object({
       then: (schema) => schema.required('Hourly rate is required for local employees'),
       otherwise: (schema) => schema,
     }),
-    unionClassId: yup.string().when('type', {
+    unionClassId: yup.number().when('type', {
       is: 'UNION',
       then: (schema) => schema.required('Union class is required for union employees'),
       otherwise: (schema) => schema,
@@ -31,7 +31,7 @@ export const updateEmployeeSchema = yup.object({
     email: yup.string().email('Invalid email'),
     phone: yup.string(),
     rate: yup.number(),
-    unionClassId: yup.string(),
+    unionClassId: yup.number(),
     hireDate: yup.date(),
     terminationDate: yup.date(),
     active: yup.boolean(),
@@ -70,7 +70,7 @@ export const updateUnionClassSchema = yup.object({
     ),
   }),
   params: yup.object({
-    id: yup.string().required('Union class ID is required'),
+    id: yup.number().required('Union class ID is required'),
   }),
 });
 
@@ -83,7 +83,7 @@ export const createUnionRateSchema = yup.object({
     endDate: yup.date().nullable(),
   }),
   params: yup.object({
-    classId: yup.string().required('Union class ID is required'),
+    classId: yup.number().required('Union class ID is required'),
   }),
 });
 
@@ -96,7 +96,7 @@ export const updateUnionRateSchema = yup.object({
     endDate: yup.date().nullable(),
   }),
   params: yup.object({
-    classId: yup.string().required('Union class ID is required'),
-    rateId: yup.string().required('Rate ID is required'),
+    classId: yup.number().required('Union class ID is required'),
+    rateId: yup.number().required('Rate ID is required'),
   }),
 });

@@ -12,6 +12,7 @@ import settingsRoutes from './settings.routes';
 import timesheetRoutes from './timesheet.routes';
 import workItemRoutes from './workItem.routes';
 import scopeRoutes from './scope.routes';
+import unionClassRoutes from './unionClass.routes';
 
 const router = Router();
 
@@ -30,5 +31,6 @@ router.use('/settings', settingsRoutes);
 router.use('/timesheets', timesheetRoutes);
 router.use('/work-items', workItemRoutes);
 router.use('/scopes', scopeRoutes);
+router.use('/union-classes', unionClassRoutes);
 
 export default router;
