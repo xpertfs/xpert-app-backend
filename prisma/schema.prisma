@@ -204,6 +204,8 @@ model Employee {
   lastName      String
   email         String?
   phone         String?
+  ssn           String?
+  dateOfBirth   DateTime?
   type          EmployeeType
   rate          Decimal?    @db.Decimal(10, 2)
   hireDate      DateTime?
@@ -214,9 +216,10 @@ model Employee {
   company       Company     @relation(fields: [companyId], references: [id])
   companyId     String
   unionClass    UnionClass? @relation(fields: [unionClassId], references: [id])
-  unionClassId  String?
+  unionClassId  Int?
   timeEntries   TimeEntry[]
   payments      Payment[]
+  documents     EmployeeDocument[]
 
   @@unique([companyId, code])
 }
@@ -227,43 +230,45 @@ enum EmployeeType {
 }
 
 model UnionClass {
-  id                  String                @id @default(uuid())
-  code                String
-  name                String
-  description         String?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  id            Int                   @id @default(autoincrement())
+  name          String
   company             Company               @relation(fields: [companyId], references: [id])
   companyId           String
-  employees           Employee[]
-  baseRates           UnionClassBaseRate[]
-  customRates         UnionClassCustomRate[]
-
-  @@unique([companyId, code])
+  baseRates     UnionClassBaseRate[]
+  customRates   UnionClassCustomRate[]
+  employees     Employee[]
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
 }
 
 model UnionClassBaseRate {
-  id            String    @id @default(uuid())
-  rate          Decimal   @db.Decimal(10, 2)
+  id            Int          @id @default(autoincrement())
+  unionClass    UnionClass   @relation(fields: [unionClassId], references: [id])
+  unionClassId  Int
+  regularRate   Float
+  overtimeRate  Float
+  benefitsRate  Float
   effectiveDate DateTime
   endDate       DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  unionClass    UnionClass @relation(fields: [unionClassId], references: [id], onDelete: Cascade)
-  unionClassId  String
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([unionClassId, effectiveDate])
 }
 
 model UnionClassCustomRate {
-  id            String    @id @default(uuid())
-  name          String
-  rate          Decimal   @db.Decimal(10, 2)
-  percentage    Boolean   @default(false)
+  id            Int          @id @default(autoincrement())
+  name          String       
+  description   String?
+  rate          Float
+  unionClass    UnionClass   @relation(fields: [unionClassId], references: [id])
+  unionClassId  Int
   effectiveDate DateTime
   endDate       DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  unionClass    UnionClass @relation(fields: [unionClassId], references: [id], onDelete: Cascade)
-  unionClassId  String
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([unionClassId, effectiveDate])
 }
 
 model TimeEntry {
@@ -419,4 +424,30 @@ enum SyncStatus {
   SUCCESS
   PARTIAL
   FAILED
+}
+
+// New model for employee documents
+model EmployeeDocument {
+  id          String    @id @default(uuid())
+  type        DocumentType
+  name        String
+  fileName    String    // Original filename
+  fileType    String    // MIME type of the file
+  fileSize    Int       // Size in bytes
+  fileData    Bytes     // Actual file content
+  description String?
+  issueDate   DateTime?
+  expiryDate  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId  String
+}
+
+enum DocumentType {
+  ID_CARD
+  DRIVERS_LICENSE
+  CERTIFICATION
+  TRAINING_CERTIFICATE
+  OTHER
 }

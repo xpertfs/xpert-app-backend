@@ -130,43 +130,91 @@ async function main() {
     prisma.unionClass.create({
       data: {
         name: 'Carpenter',
-        code: 'CARP',
-        description: 'Skilled carpenter union class',
         companyId: company.id,
         baseRates: {
           create: {
-            rate: 38.50,
+            regularRate: 38.5,
+            overtimeRate: 57.75,
+            benefitsRate: 15.4,
             effectiveDate: new Date('2024-01-01'),
           },
         },
+        customRates: {
+          create: [
+            {
+              name: 'Holiday Rate',
+              description: 'Holiday pay rate',
+              rate: 77.0,
+              effectiveDate: new Date('2024-01-01'),
+            },
+            {
+              name: 'Night Shift Premium',
+              description: 'Night shift differential',
+              rate: 3.85,
+              effectiveDate: new Date('2024-01-01'),
+            }
+          ]
+        }
       },
     }),
     prisma.unionClass.create({
       data: {
         name: 'Electrician',
-        code: 'ELEC',
-        description: 'Licensed electrician union class',
         companyId: company.id,
         baseRates: {
           create: {
-            rate: 42.75,
+            regularRate: 42.75,
+            overtimeRate: 64.13,
+            benefitsRate: 17.1,
             effectiveDate: new Date('2024-01-01'),
           },
         },
+        customRates: {
+          create: [
+            {
+              name: 'Holiday Rate',
+              description: 'Holiday pay rate',
+              rate: 85.5,
+              effectiveDate: new Date('2024-01-01'),
+            },
+            {
+              name: 'Night Shift Premium',
+              description: 'Night shift differential',
+              rate: 4.28,
+              effectiveDate: new Date('2024-01-01'),
+            }
+          ]
+        }
       },
     }),
     prisma.unionClass.create({
       data: {
         name: 'Plumber',
-        code: 'PLMB',
-        description: 'Licensed plumber union class',
         companyId: company.id,
         baseRates: {
           create: {
-            rate: 40.25,
+            regularRate: 40.25,
+            overtimeRate: 60.38,
+            benefitsRate: 16.1,
             effectiveDate: new Date('2024-01-01'),
           },
         },
+        customRates: {
+          create: [
+            {
+              name: 'Holiday Rate',
+              description: 'Holiday pay rate',
+              rate: 80.5,
+              effectiveDate: new Date('2024-01-01'),
+            },
+            {
+              name: 'Night Shift Premium',
+              description: 'Night shift differential',
+              rate: 4.03,
+              effectiveDate: new Date('2024-01-01'),
+            }
+          ]
+        }
       },
     }),
   ]);

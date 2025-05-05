@@ -31,7 +31,6 @@ export const getEmployees = async (req: Request, res: Response) => {
             OR: [
               { firstName: { contains: search as string, mode: 'insensitive' } },
               { lastName: { contains: search as string, mode: 'insensitive' } },
-              { code: { contains: search as string, mode: 'insensitive' } },
               { email: { contains: search as string, mode: 'insensitive' } },
             ],
           }
@@ -46,7 +45,6 @@ export const getEmployees = async (req: Request, res: Response) => {
           select: {
             id: true,
             name: true,
-            code: true,
             baseRates: {
               where: {
                 effectiveDate: {
@@ -81,7 +79,7 @@ export const getEmployees = async (req: Request, res: Response) => {
       let currentRate = employee.rate;
       
       if (employee.type === 'UNION' && employee.unionClass?.baseRates[0]) {
-        currentRate = employee.unionClass.baseRates[0].rate;
+        currentRate = employee.unionClass.baseRates[0].regularRate;
       }
       
       return {
@@ -465,7 +463,7 @@ export const getUnionClasses = async (req: Request, res: Response) => {
         },
       },
       orderBy: {
-        code: 'asc',
+        name: 'asc',
       },
     });
 
@@ -484,25 +482,11 @@ export const getUnionClasses = async (req: Request, res: Response) => {
  */
 export const createUnionClass = async (req: Request, res: Response) => {
   try {
-    const { code, name, description, baseRate } = req.body;
+    const { name, baseRates } = req.body;
     const companyId = req.user?.companyId;
 
     if (!companyId) {
       return res.status(400).json({ message: 'Company ID is required' });
-    }
-
-    // Check if union class code already exists for this company
-    const existingClass = await prisma.unionClass.findUnique({
-      where: {
-        companyId_code: {
-          companyId,
-          code,
-        },
-      },
-    });
-
-    if (existingClass) {
-      return res.status(409).json({ message: 'Union class code already exists' });
     }
 
     // Create union class with initial base rate
@@ -510,9 +494,7 @@ export const createUnionClass = async (req: Request, res: Response) => {
       // Create union class
       const newClass = await tx.unionClass.create({
         data: {
-          code,
           name,
-          description,
           companyId,
         },
       });
@@ -521,8 +503,11 @@ export const createUnionClass = async (req: Request, res: Response) => {
       await tx.unionClassBaseRate.create({
         data: {
           unionClassId: newClass.id,
-          rate: baseRate,
-          effectiveDate: new Date(),
+          regularRate: parseFloat(baseRates[0].regularRate),
+          overtimeRate: parseFloat(baseRates[0].overtimeRate),
+          benefitsRate: parseFloat(baseRates[0].benefitsRate),
+          effectiveDate: new Date(baseRates[0].effectiveDate),
+          endDate: baseRates[0].endDate ? new Date(baseRates[0].endDate) : null,
         },
       });
 
@@ -532,7 +517,11 @@ export const createUnionClass = async (req: Request, res: Response) => {
           id: newClass.id,
         },
         include: {
-          baseRates: true,
+          baseRates: {
+            orderBy: {
+              effectiveDate: 'desc',
+            },
+          },
         },
       });
     });
@@ -553,7 +542,7 @@ export const createUnionClass = async (req: Request, res: Response) => {
 export const updateUnionClass = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, description } = req.body;
+    const { name, baseRates } = req.body;
     const companyId = req.user?.companyId;
 
     if (!companyId) {
@@ -563,7 +552,7 @@ export const updateUnionClass = async (req: Request, res: Response) => {
     // Check if union class exists and belongs to this company
     const existingClass = await prisma.unionClass.findUnique({
       where: {
-        id,
+        id: parseInt(id),
         companyId,
       },
     });
@@ -572,22 +561,60 @@ export const updateUnionClass = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Union class not found' });
     }
 
-    // Update union class
-    const unionClass = await prisma.unionClass.update({
-      where: {
-        id,
-      },
-      data: {
-        name,
-        description,
-      },
-      include: {
-        baseRates: {
-          orderBy: {
-            effectiveDate: 'desc',
+    // Update union class and add new base rate if provided
+    const unionClass = await prisma.$transaction(async (tx) => {
+      // Update union class
+      const updatedClass = await tx.unionClass.update({
+        where: {
+          id: parseInt(id),
+        },
+        data: {
+          name,
+        },
+      });
+
+      // Add new base rate if provided
+      if (baseRates && baseRates.length > 0) {
+        const newRate = baseRates[0];
+        await tx.unionClassBaseRate.create({
+          data: {
+            unionClassId: parseInt(id),
+            regularRate: parseFloat(newRate.regularRate),
+            overtimeRate: parseFloat(newRate.overtimeRate),
+            benefitsRate: parseFloat(newRate.benefitsRate),
+            effectiveDate: new Date(newRate.effectiveDate),
+            endDate: newRate.endDate ? new Date(newRate.endDate) : null,
+          },
+        });
+
+        // Update end date of previous base rate
+        await tx.unionClassBaseRate.updateMany({
+          where: {
+            unionClassId: parseInt(id),
+            effectiveDate: {
+              lt: new Date(newRate.effectiveDate),
+            },
+            endDate: null,
+          },
+          data: {
+            endDate: new Date(newRate.effectiveDate),
+          },
+        });
+      }
+
+      // Return updated union class with base rates
+      return tx.unionClass.findUnique({
+        where: {
+          id: parseInt(id),
+        },
+        include: {
+          baseRates: {
+            orderBy: {
+              effectiveDate: 'desc',
+            },
           },
         },
-      },
+      });
     });
 
     return res.status(200).json(unionClass);
@@ -718,7 +745,7 @@ export const getUnionRates = async (req: Request, res: Response) => {
 export const createUnionRate = async (req: Request, res: Response) => {
   try {
     const { classId } = req.params;
-    const { rate, effectiveDate, name, percentage = false, isCustomRate = false } = req.body;
+    const { regularRate, overtimeRate, benefitsRate, effectiveDate, endDate } = req.body;
     const companyId = req.user?.companyId;
 
     if (!companyId) {
@@ -728,7 +755,7 @@ export const createUnionRate = async (req: Request, res: Response) => {
     // Check if union class exists and belongs to this company
     const existingClass = await prisma.unionClass.findUnique({
       where: {
-        id: classId,
+        id: parseInt(classId),
         companyId,
       },
     });
@@ -737,41 +764,24 @@ export const createUnionRate = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Union class not found' });
     }
 
-    // Create base or custom rate
-    if (isCustomRate) {
-      // Create custom rate
-      if (!name) {
-        return res.status(400).json({ message: 'Name is required for custom rates' });
-      }
-
-      const customRate = await prisma.unionClassCustomRate.create({
+    // Create new base rate
+    const baseRate = await prisma.$transaction(async (tx) => {
+      // Create new base rate
+      const newRate = await tx.unionClassBaseRate.create({
         data: {
-          unionClassId: classId,
-          name,
-          rate,
-          percentage,
+          unionClassId: parseInt(classId),
+          regularRate: parseFloat(regularRate),
+          overtimeRate: parseFloat(overtimeRate),
+          benefitsRate: parseFloat(benefitsRate),
           effectiveDate: new Date(effectiveDate),
+          endDate: endDate ? new Date(endDate) : null,
         },
       });
 
-      return res.status(201).json(customRate);
-    } else {
-      // Create base rate
-      const baseRate = await prisma.unionClassBaseRate.create({
-        data: {
-          unionClassId: classId,
-          rate,
-          effectiveDate: new Date(effectiveDate),
-        },
-      });
-
-      // Update end date of previous base rate if exists
-      await prisma.unionClassBaseRate.updateMany({
+      // Update end date of previous base rate
+      await tx.unionClassBaseRate.updateMany({
         where: {
-          unionClassId: classId,
-          id: {
-            not: baseRate.id,
-          },
+          unionClassId: parseInt(classId),
           effectiveDate: {
             lt: new Date(effectiveDate),
           },
@@ -782,8 +792,10 @@ export const createUnionRate = async (req: Request, res: Response) => {
         },
       });
 
-      return res.status(201).json(baseRate);
-    }
+      return newRate;
+    });
+
+    return res.status(201).json(baseRate);
   } catch (error) {
     logger.error(`Error creating union rate for class ${req.params.classId}:`, error);
     return res.status(500).json({ message: 'Failed to create union rate' });
@@ -799,7 +811,7 @@ export const createUnionRate = async (req: Request, res: Response) => {
 export const updateUnionRate = async (req: Request, res: Response) => {
   try {
     const { classId, rateId } = req.params;
-    const { rate, effectiveDate, endDate, name, percentage } = req.body;
+    const { regularRate, overtimeRate, benefitsRate, effectiveDate, endDate } = req.body;
     const companyId = req.user?.companyId;
 
     if (!companyId) {
@@ -809,7 +821,7 @@ export const updateUnionRate = async (req: Request, res: Response) => {
     // Check if union class exists and belongs to this company
     const existingClass = await prisma.unionClass.findUnique({
       where: {
-        id: classId,
+        id: parseInt(classId),
         companyId,
       },
     });
@@ -818,57 +830,22 @@ export const updateUnionRate = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Union class not found' });
     }
 
-    // Check if it's a base rate or custom rate
-    const baseRate = await prisma.unionClassBaseRate.findUnique({
+    // Update base rate
+    const updatedRate = await prisma.unionClassBaseRate.update({
       where: {
-        id: rateId,
-        unionClassId: classId,
+        id: parseInt(rateId),
+        unionClassId: parseInt(classId),
+      },
+      data: {
+        regularRate: parseFloat(regularRate),
+        overtimeRate: parseFloat(overtimeRate),
+        benefitsRate: parseFloat(benefitsRate),
+        effectiveDate: effectiveDate ? new Date(effectiveDate) : undefined,
+        endDate: endDate ? new Date(endDate) : undefined,
       },
     });
 
-    if (baseRate) {
-      // Update base rate
-      const updatedRate = await prisma.unionClassBaseRate.update({
-        where: {
-          id: rateId,
-        },
-        data: {
-          rate,
-          effectiveDate: effectiveDate ? new Date(effectiveDate) : undefined,
-          endDate: endDate ? new Date(endDate) : undefined,
-        },
-      });
-
-      return res.status(200).json(updatedRate);
-    }
-
-    // Check for custom rate
-    const customRate = await prisma.unionClassCustomRate.findUnique({
-      where: {
-        id: rateId,
-        unionClassId: classId,
-      },
-    });
-
-    if (customRate) {
-      // Update custom rate
-      const updatedRate = await prisma.unionClassCustomRate.update({
-        where: {
-          id: rateId,
-        },
-        data: {
-          name,
-          rate,
-          percentage,
-          effectiveDate: effectiveDate ? new Date(effectiveDate) : undefined,
-          endDate: endDate ? new Date(endDate) : undefined,
-        },
-      });
-
-      return res.status(200).json(updatedRate);
-    }
-
-    return res.status(404).json({ message: 'Rate not found' });
+    return res.status(200).json(updatedRate);
   } catch (error) {
     logger.error(`Error updating union rate ${req.params.rateId}:`, error);
     return res.status(500).json({ message: 'Failed to update union rate' });

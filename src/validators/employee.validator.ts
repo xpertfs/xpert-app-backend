@@ -43,17 +43,31 @@ export const updateEmployeeSchema = yup.object({
 
 export const createUnionClassSchema = yup.object({
   body: yup.object({
-    code: yup.string().required('Class code is required'),
-    name: yup.string().required('Class name is required'),
-    description: yup.string(),
-    baseRate: yup.number().required('Base rate is required'),
+    name: yup.string().required('Name is required'),
+    baseRates: yup.array().of(
+      yup.object({
+        regularRate: yup.number().required('Regular rate is required').min(0, 'Rate must be positive'),
+        overtimeRate: yup.number().required('Overtime rate is required').min(0, 'Rate must be positive'),
+        benefitsRate: yup.number().required('Benefits rate is required').min(0, 'Rate must be positive'),
+        effectiveDate: yup.date().required('Effective date is required'),
+        endDate: yup.date().nullable(),
+      })
+    ).min(1, 'At least one base rate is required'),
   }),
 });
 
 export const updateUnionClassSchema = yup.object({
   body: yup.object({
     name: yup.string(),
-    description: yup.string(),
+    baseRates: yup.array().of(
+      yup.object({
+        regularRate: yup.number().min(0, 'Rate must be positive'),
+        overtimeRate: yup.number().min(0, 'Rate must be positive'),
+        benefitsRate: yup.number().min(0, 'Rate must be positive'),
+        effectiveDate: yup.date(),
+        endDate: yup.date().nullable(),
+      })
+    ),
   }),
   params: yup.object({
     id: yup.string().required('Union class ID is required'),
@@ -62,15 +76,11 @@ export const updateUnionClassSchema = yup.object({
 
 export const createUnionRateSchema = yup.object({
   body: yup.object({
-    rate: yup.number().required('Rate is required'),
+    regularRate: yup.number().required('Regular rate is required').min(0, 'Rate must be positive'),
+    overtimeRate: yup.number().required('Overtime rate is required').min(0, 'Rate must be positive'),
+    benefitsRate: yup.number().required('Benefits rate is required').min(0, 'Rate must be positive'),
     effectiveDate: yup.date().required('Effective date is required'),
-    name: yup.string().when('isCustomRate', {
-      is: true,
-      then: (schema) => schema.required('Name is required for custom rates'),
-      otherwise: (schema) => schema,
-    }),
-    percentage: yup.boolean(),
-    isCustomRate: yup.boolean(),
+    endDate: yup.date().nullable(),
   }),
   params: yup.object({
     classId: yup.string().required('Union class ID is required'),
@@ -79,11 +89,11 @@ export const createUnionRateSchema = yup.object({
 
 export const updateUnionRateSchema = yup.object({
   body: yup.object({
-    rate: yup.number(),
+    regularRate: yup.number().min(0, 'Rate must be positive'),
+    overtimeRate: yup.number().min(0, 'Rate must be positive'),
+    benefitsRate: yup.number().min(0, 'Rate must be positive'),
     effectiveDate: yup.date(),
-    endDate: yup.date(),
-    name: yup.string(),
-    percentage: yup.boolean(),
+    endDate: yup.date().nullable(),
   }),
   params: yup.object({
     classId: yup.string().required('Union class ID is required'),

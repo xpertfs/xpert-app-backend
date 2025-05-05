@@ -15,17 +15,20 @@ import scopeRoutes from './scope.routes';
 
 const router = Router();
 
+// Auth routes (no authentication required)
 router.use('/auth', authRoutes);
+
+// Protected routes
+router.use('/employees', employeeRoutes);
 router.use('/projects', projectRoutes);
 router.use('/clients', clientRoutes);
 router.use('/contractors', contractorRoutes);
-router.use('/employees', employeeRoutes);
 router.use('/expenses', expenseRoutes);
 router.use('/materials', materialRoutes);
 router.use('/reports', reportRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/timesheets', timesheetRoutes);
-router.use('/projects', workItemRoutes);
-router.use('/', scopeRoutes);
+router.use('/work-items', workItemRoutes);
+router.use('/scopes', scopeRoutes);
 
 export default router;
