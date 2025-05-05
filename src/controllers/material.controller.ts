@@ -819,8 +819,8 @@ export const getBestPrice = async (req: Request, res: Response) => {
       price: price.price,
       effectiveDate: price.effectiveDate,
       endDate: price.endDate,
-      difference: price.price - bestPrice.price,
-      percentDifference: ((price.price - bestPrice.price) / bestPrice.price) * 100,
+      difference: Number(price.price) - Number(bestPrice.price),
+      percentDifference: ((Number(price.price) - Number(bestPrice.price)) / Number(bestPrice.price)) * 100,
     }));
 
     return res.status(200).json({
